@@ -3,6 +3,7 @@
 
 #define DOUBLEDOUBLE_E DoubleDouble(2.718281828459045, 1.4456468917292502e-16)
 #define DOUBLEDOUBLE_PI DoubleDouble(3.141592653589793, 1.2246467991473532e-16)
+#define DOUBLEDOUBLE_LN2 DoubleDouble(0.6931471805599453, 2.3190468138462996e-17)
 
 class DoubleDouble
 {
@@ -18,14 +19,6 @@ public:
     DoubleDouble &operator-=(const DoubleDouble &other);
     DoubleDouble &operator*=(const DoubleDouble &other);
     DoubleDouble &operator/=(const DoubleDouble &other);
-    // DoubleDouble operator+(double other);
-    // DoubleDouble operator-(double other);
-    // DoubleDouble operator*(double other);
-    // DoubleDouble operator/(double other);
-    // friend DoubleDouble operator+(double left, const DoubleDouble &right);
-    // friend DoubleDouble operator-(double left, const DoubleDouble &right);
-    // friend DoubleDouble operator*(double left, const DoubleDouble &right);
-    // friend DoubleDouble operator/(double left, const DoubleDouble &right);
     operator bool() const;
     bool operator==(const DoubleDouble &other) const;
     bool operator>(const DoubleDouble &other) const;
@@ -34,7 +27,7 @@ public:
     bool operator<=(const DoubleDouble &other) const;
     bool operator>=(const DoubleDouble &other) const;
     operator double();
-    DoubleDouble round();
+    DoubleDouble trunc();
     DoubleDouble power(int n);
     DoubleDouble exp();
 };

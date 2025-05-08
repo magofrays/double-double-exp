@@ -25,50 +25,54 @@ std::pair<double, double> two_differece(const double &x, const double &y)
     return {r, e};
 }
 
+std::pair<double, double> split(const double &a)
+{
+    double t = 134217729 * a;
+    double ahi = t - (t - a);
+    double alo = a - ahi;
+    return {ahi, alo};
+}
+
 std::pair<double, double> two_product(const double &x, const double &y)
 {
-    double u = x * 134217729.0;
-    double v = y * 134217729.0;
-    double s = u - (u - x);
-    double t = v - (v - y);
-    double f = x - s;
-    double g = y - t;
-    double r = x * y;
-    double e = ((s * t - r) + s * g + f * t) + f * g;
-    return {r, e};
+    double res = x * y;
+    auto [xhi, xlo] = split(x);
+    auto [yhi, ylo] = split(y);
+    double err = ((xhi * yhi - res) + xhi * ylo + xlo * yhi) + xlo * ylo;
+    return {res, err};
 }
 
 DoubleDouble operator+(const DoubleDouble &first, const DoubleDouble &second)
 {
-    auto [res, err] = two_sum(first.res, second.err);
-    err += first.err + second.err;
-    auto [new_res, new_err] = two_sum_quick(res, err);
-    return DoubleDouble(new_res, new_err);
+    auto Double = two_sum(first.res, second.res);
+    Double.second += first.err + second.err;
+    Double = two_sum_quick(Double.first, Double.second);
+    return DoubleDouble(Double.first, Double.second);
 }
 
 DoubleDouble operator-(const DoubleDouble &first, const DoubleDouble &second)
 {
-    auto [res, err] = two_differece(first.res, second.res);
-    err += first.err + second.res;
-    auto [new_res, new_err] = two_sum_quick(res, err);
-    return DoubleDouble(new_res, new_err);
+    auto Double = two_differece(first.res, second.res);
+    Double.second += (first.err - second.err);
+    Double = two_sum_quick(Double.first, Double.second);
+    return DoubleDouble(Double.first, Double.second);
 }
 
 DoubleDouble operator*(const DoubleDouble &first, const DoubleDouble &second)
 {
-    auto [res, err] = two_product(first.res, second.res);
-    err += first.err + second.err;
-    auto [new_res, new_err] = two_sum_quick(res, err);
-    return DoubleDouble(new_res, new_err);
+    auto Double = two_product(first.res, second.res);
+    Double.second += first.res * second.err + second.res * first.err;
+    Double = two_sum_quick(Double.first, Double.second);
+    return DoubleDouble(Double.first, Double.second);
 }
 
 DoubleDouble operator/(const DoubleDouble &first, const DoubleDouble &second)
 {
     double res = first.res / second.res;
-    auto [s, f] = two_product(res, second.res);
-    double err = (first.res - s - f + first.err - res * second.err) / second.res;
-    auto [new_res, new_err] = two_sum_quick(res, err);
-    return DoubleDouble(new_res, new_err);
+    auto temp = two_product(res, second.res);
+    double err = (first.res - temp.first - temp.second + first.err - res * second.err) / second.res;
+    auto Double = two_sum_quick(res, err);
+    return DoubleDouble(Double.first, Double.second);
 }
 
 DoubleDouble &DoubleDouble::operator+=(const DoubleDouble &other)
@@ -94,46 +98,6 @@ DoubleDouble &DoubleDouble::operator/=(const DoubleDouble &other)
     *this = (static_cast<DoubleDouble>(*this) / other);
     return *this;
 }
-
-// DoubleDouble DoubleDouble::operator+(double other)
-// {
-//     return *this + DoubleDouble(other);
-// }
-
-// DoubleDouble DoubleDouble::operator-(double other)
-// {
-//     return *this - DoubleDouble(other);
-// }
-
-// DoubleDouble DoubleDouble::operator*(double other)
-// {
-//     return *this * DoubleDouble(other);
-// }
-
-// DoubleDouble DoubleDouble::operator/(double other)
-// {
-//     return *this / DoubleDouble(other);
-// }
-
-// DoubleDouble operator+(double left, const DoubleDouble &right)
-// {
-//     return DoubleDouble(left) + right;
-// }
-
-// DoubleDouble operator-(double left, const DoubleDouble &right)
-// {
-//     return DoubleDouble(left) - right;
-// }
-
-// DoubleDouble operator*(double left, const DoubleDouble &right)
-// {
-//     return DoubleDouble(left) * right;
-// }
-
-// DoubleDouble operator/(double left, const DoubleDouble &right)
-// {
-//     return DoubleDouble(left) / right;
-// }
 
 DoubleDouble::operator bool() const
 {
@@ -169,9 +133,9 @@ bool DoubleDouble::operator<=(const DoubleDouble &other) const
 {
     return res < other.res || res == other.res && err <= other.err;
 }
-DoubleDouble DoubleDouble::round()
+DoubleDouble DoubleDouble::trunc()
 {
-    return DoubleDouble(std::round(res), std::round(err));
+    return DoubleDouble(std::trunc(res), std::trunc(err));
 }
 
 DoubleDouble DoubleDouble::power(int n)
@@ -201,57 +165,14 @@ DoubleDouble DoubleDouble::power(int n)
 
 DoubleDouble DoubleDouble::exp()
 {
-    DoubleDouble n = round();
-    DoubleDouble x = *this - n;
-    DoubleDouble u = (((((((((((x +
-                                DoubleDouble(156)) *
-                                   x +
-                               DoubleDouble(12012)) *
-                                  x +
-                              DoubleDouble(600600)) *
-                                 x +
-                             DoubleDouble(21621600)) *
-                                x +
-                            DoubleDouble(588107520)) *
-                               x +
-                           DoubleDouble(12350257920)) *
-                              x +
-                          DoubleDouble(201132771840)) *
-                             x +
-                         DoubleDouble(2514159648000)) *
-                            x +
-                        DoubleDouble(23465490048000)) *
-                           x +
-                       DoubleDouble(154872234316800)) *
-                          x +
-                      DoubleDouble(647647525324800)) *
-                         x +
-                     DoubleDouble(1295295050649600);
-    DoubleDouble v = (((((((((((x -
-                                DoubleDouble(156)) *
-                                   x +
-                               DoubleDouble(12012)) *
-                                  x -
-                              DoubleDouble(600600)) *
-                                 x +
-                             DoubleDouble(21621600)) *
-                                x -
-                            DoubleDouble(588107520)) *
-                               x +
-                           DoubleDouble(12350257920)) *
-                              x -
-                          DoubleDouble(201132771840)) *
-                             x +
-                         DoubleDouble(2514159648000)) *
-                            x -
-                        DoubleDouble(23465490048000)) *
-                           x +
-                       DoubleDouble(154872234316800)) *
-                          x -
-                      DoubleDouble(647647525324800)) *
-                         x +
-                     DoubleDouble(1295295050649600);
-    return DOUBLEDOUBLE_E.power(n) * (u / v);
+    DoubleDouble m = ((*this) / DOUBLEDOUBLE_LN2).trunc();
+    DoubleDouble x = (*this - DOUBLEDOUBLE_LN2 * m);
+    DoubleDouble first(2);
+    first = first.power(m);
+    DoubleDouble second = DoubleDouble(1) + x + x.power(2) / DoubleDouble(2) + x.power(3) / DoubleDouble(6) +
+                          x.power(4) / DoubleDouble(24) + x.power(5) / DoubleDouble(120) + x.power(6) / DoubleDouble(720) +
+                          x.power(7) / DoubleDouble(5040) + x.power(8) / DoubleDouble(40320) + x.power(9) / DoubleDouble(362880) + x.power(10) / DoubleDouble(3628800);
+    return first * second;
 }
 
 DoubleDouble::operator double()
