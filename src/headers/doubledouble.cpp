@@ -25,12 +25,26 @@ std::pair<double, double> two_differece(const double &x, const double &y)
     return {r, e};
 }
 
-std::pair<double, double> split(const double &a)
+std::pair<double, double> split(double a)
 {
-    double t = 134217729 * a;
-    double ahi = t - (t - a);
-    double alo = a - ahi;
-    return {ahi, alo};
+    double temp;
+    double hi, lo;
+    if (a > SPLIT_THRESH || a < -SPLIT_THRESH)
+    {
+        a *= 3.7252902984619140625e-09; // 2^-28
+        temp = SPLITTER * a;
+        hi = temp - (temp - a);
+        lo = a - hi;
+        hi *= 268435456.0; // 2^28
+        lo *= 268435456.0; // 2^28
+    }
+    else
+    {
+        temp = SPLITTER * a;
+        hi = temp - (temp - a);
+        lo = a - hi;
+    }
+    return {hi, lo};
 }
 
 std::pair<double, double> two_product(const double &x, const double &y)
@@ -42,23 +56,92 @@ std::pair<double, double> two_product(const double &x, const double &y)
     return {res, err};
 }
 
-DoubleDouble operator+(const DoubleDouble &first, const DoubleDouble &second)
+// ADDITION
+inline DoubleDouble add(double first, double second)
 {
-    auto Double = two_sum(first.res, second.res);
-    Double.second += first.err + second.err;
-    Double = two_sum_quick(Double.first, Double.second);
-    return DoubleDouble(Double.first, Double.second);
+    auto res = two_sum(first, second);
+    return DoubleDouble(res.first, res.second);
 }
 
-DoubleDouble operator-(const DoubleDouble &first, const DoubleDouble &second)
+inline DoubleDouble operator+(const DoubleDouble &first, double second)
 {
-    auto Double = two_differece(first.res, second.res);
-    Double.second += (first.err - second.err);
-    Double = two_sum_quick(Double.first, Double.second);
-    return DoubleDouble(Double.first, Double.second);
+    auto res = two_sum(first.res, second);
+    res.second += first.err;
+    res = two_sum_quick(res.first, res.second);
+    return DoubleDouble(res.first, res.second);
 }
 
-DoubleDouble operator*(const DoubleDouble &first, const DoubleDouble &second)
+inline DoubleDouble operator+(double first, const DoubleDouble &second)
+{
+    return (second + first);
+}
+
+inline DoubleDouble operator+(const DoubleDouble &first, const DoubleDouble &second) // IEEE ADD
+{
+    auto Res = two_sum(first.res, second.res);
+    auto Error = two_sum(first.err, second.err);
+    Res.second += Error.first;
+    Res = two_sum_quick(Res.first, Res.second);
+    Res.second += Error.second;
+    Res = two_sum_quick(Res.first, Res.second);
+    return DoubleDouble(Res.first, Res.second);
+}
+
+// SUBTRACT
+inline DoubleDouble sub(double first, double second)
+{
+    auto res = two_differece(first, second);
+    return DoubleDouble(res.first, res.second);
+}
+
+inline DoubleDouble operator-(const DoubleDouble &first, double second)
+{
+    auto res = two_differece(first.res, second);
+    res.second += first.err;
+    res = two_sum_quick(res.first, res.second);
+    return DoubleDouble(res.first, res.second);
+}
+
+inline DoubleDouble operator-(double first, const DoubleDouble &second)
+{
+    auto res = two_differece(first, second.res);
+    res.second += second.err;
+    res = two_sum_quick(res.first, res.second);
+    return DoubleDouble(res.first, res.second);
+}
+
+inline DoubleDouble operator-(const DoubleDouble &first, const DoubleDouble &second) // IEEE SUB
+{
+    auto Res = two_differece(first.res, second.res);
+    auto Err = two_differece(first.err, second.err);
+    Res.second += Err.first;
+    Res = two_sum_quick(Res.first, Res.second);
+    Res.second += Err.second;
+    Res = two_sum_quick(Res.first, Res.second);
+    return DoubleDouble(Res.first, Res.second);
+}
+
+// MULTIPLY
+inline DoubleDouble mul(double first, double second)
+{
+    auto res = two_product(first, second);
+    return DoubleDouble(res.first, res.second);
+}
+
+inline DoubleDouble operator*(const DoubleDouble &first, double second)
+{
+    auto res = two_product(first.res, second);
+    res.second += (first.err * second);
+    res = two_sum_quick(res.first, res.second);
+    return DoubleDouble(res.first, res.second);
+}
+
+inline DoubleDouble operator*(double first, const DoubleDouble &second)
+{
+    return (second * first);
+}
+
+inline DoubleDouble operator*(const DoubleDouble &first, const DoubleDouble &second)
 {
     auto Double = two_product(first.res, second.res);
     Double.second += first.res * second.err + second.res * first.err;
@@ -66,36 +149,99 @@ DoubleDouble operator*(const DoubleDouble &first, const DoubleDouble &second)
     return DoubleDouble(Double.first, Double.second);
 }
 
-DoubleDouble operator/(const DoubleDouble &first, const DoubleDouble &second)
+// DIVISION
+inline DoubleDouble div(double a, double b)
 {
-    double res = first.res / second.res;
-    auto temp = two_product(res, second.res);
-    double err = (first.res - temp.first - temp.second + first.err - res * second.err) / second.res;
-    auto Double = two_sum_quick(res, err);
-    return DoubleDouble(Double.first, Double.second);
+
+    double q1 = a / b;
+
+    /* Compute  a - q1 * b */
+    auto res = two_product(q1, b);
+    auto s = two_differece(a, res.first);
+    s.second -= res.second;
+
+    /* get next approximation */
+    double q2 = (s.first + s.second) / b;
+
+    s = two_sum_quick(q1, q2);
+
+    return DoubleDouble(s.first, s.second);
+}
+
+inline DoubleDouble operator/(const DoubleDouble &first, double second)
+{
+    double q1 = first.res / second;
+    auto p = two_product(q1, second);
+    auto s = two_differece(first.res, p.first);
+    s.second += first.err;
+    s.second -= p.second;
+    double q2 = (s.first + s.second) / second;
+    auto r = two_sum_quick(q1, q2);
+    return DoubleDouble(r.first, r.second);
+}
+
+inline DoubleDouble operator/(double first, const DoubleDouble &second)
+{
+    return DoubleDouble(first) / second;
+}
+
+inline DoubleDouble operator/(const DoubleDouble &first, const DoubleDouble &second)
+{
+    double q1 = first.res / second.res;
+    DoubleDouble r = first - q1 * second;
+    double q2 = r.res / second.res;
+    r -= (q2 * second);
+    double q3 = r.res / second.res;
+    auto res = two_sum_quick(q1, q2);
+    r = DoubleDouble(res.first, res.second) + q3;
+    return r;
 }
 
 DoubleDouble &DoubleDouble::operator+=(const DoubleDouble &other)
 {
-    *this = (static_cast<DoubleDouble>(*this) + other);
+    *this = *this + other;
     return *this;
 }
 
 DoubleDouble &DoubleDouble::operator-=(const DoubleDouble &other)
 {
-    *this = (static_cast<DoubleDouble>(*this) - other);
+    *this = *this - other;
     return *this;
 }
 
 DoubleDouble &DoubleDouble::operator*=(const DoubleDouble &other)
 {
-    *this = (static_cast<DoubleDouble>(*this) * other);
+    *this = *this * other;
     return *this;
 }
 
 DoubleDouble &DoubleDouble::operator/=(const DoubleDouble &other)
 {
-    *this = (static_cast<DoubleDouble>(*this) / other);
+    *this = *this / other;
+    return *this;
+}
+
+DoubleDouble &DoubleDouble::operator+=(double other)
+{
+    *this = *this + other;
+    return *this;
+}
+
+DoubleDouble &DoubleDouble::operator-=(double other)
+{
+    *this = *this - other;
+    return *this;
+}
+
+DoubleDouble &DoubleDouble::operator*=(double other)
+{
+    *this = *this * other;
+    return *this;
+}
+
+DoubleDouble &DoubleDouble::operator/=(double other)
+{
+    *this = *this / other;
     return *this;
 }
 
@@ -163,16 +309,79 @@ DoubleDouble DoubleDouble::power(int n)
     return res;
 }
 
-DoubleDouble DoubleDouble::exp()
+inline DoubleDouble mul_pwr2(const DoubleDouble &a, double b) // double-double * double,  where double is a power of 2.
 {
-    DoubleDouble m = ((*this) / DOUBLEDOUBLE_LN2).trunc();
-    DoubleDouble x = (*this - DOUBLEDOUBLE_LN2 * m);
-    DoubleDouble first(2);
-    first = first.power(m);
-    DoubleDouble second = DoubleDouble(1) + x + x.power(2) / DoubleDouble(2) + x.power(3) / DoubleDouble(6) +
-                          x.power(4) / DoubleDouble(24) + x.power(5) / DoubleDouble(120) + x.power(6) / DoubleDouble(720) +
-                          x.power(7) / DoubleDouble(5040) + x.power(8) / DoubleDouble(40320) + x.power(9) / DoubleDouble(362880) + x.power(10) / DoubleDouble(3628800);
-    return first * second;
+    return DoubleDouble(a.res * b, a.err * b);
+}
+
+inline std::pair<double, double> two_sqr(double a) // Computes fl(a*a) and err(a*a)
+{
+    double res = a * a;
+    auto [hi, lo] = split(a);
+    double err = ((hi * hi - res) + 2.0 * hi * lo) + lo * lo;
+    return {res, err};
+}
+
+inline DoubleDouble sqr(const DoubleDouble &a) // Squaring
+{
+    auto p = two_sqr(a.res);
+    p.second += 2.0 * a.res * a.err;
+    p.second += a.err * a.err;
+    auto s = two_sum_quick(p.first, p.second);
+    return DoubleDouble(s.first, s.second);
+}
+
+inline DoubleDouble ldexp(const DoubleDouble &a, int exp)
+{
+    return DoubleDouble(std::ldexp(a.res, exp), std::ldexp(a.err, exp));
+}
+
+DoubleDouble exp(const DoubleDouble &a)
+{
+    double k = 512.0;
+    double inv_k = 1.0 / k;
+    if (a.res <= -709.0)
+    {
+        return DoubleDouble(0.0);
+    }
+    if (a.res >= 709.0)
+    {
+        return DOUBLEDOUBLE_INF;
+    }
+    if (a.res == 0.0)
+    {
+        return DoubleDouble(1.0);
+    }
+    if (a.res == 1.0)
+    {
+        return DOUBLEDOUBLE_E;
+    }
+    double m = std::floor(a.res / DOUBLEDOUBLE_LN2 + 0.5);
+    DoubleDouble r = mul_pwr2(a - DOUBLEDOUBLE_LN2 * m, inv_k);
+    DoubleDouble p = sqr(r);
+    DoubleDouble s = r + mul_pwr2(p, 0.5);
+    p *= r;
+    DoubleDouble t = p * DoubleDouble(inv_fact[0][0], inv_fact[0][1]);
+    int i = 0;
+    do
+    {
+        s += t;
+        p *= r;
+        ++i;
+        t = p * DoubleDouble(inv_fact[i][0], inv_fact[i][1]);
+    } while (std::abs(double(t)) > inv_k * EPSILON && i < 5);
+    s += t;
+    s = mul_pwr2(s, 2.0) + sqr(s);
+    s = mul_pwr2(s, 2.0) + sqr(s);
+    s = mul_pwr2(s, 2.0) + sqr(s);
+    s = mul_pwr2(s, 2.0) + sqr(s);
+    s = mul_pwr2(s, 2.0) + sqr(s);
+    s = mul_pwr2(s, 2.0) + sqr(s);
+    s = mul_pwr2(s, 2.0) + sqr(s);
+    s = mul_pwr2(s, 2.0) + sqr(s);
+    s = mul_pwr2(s, 2.0) + sqr(s);
+    s += 1.0;
+    return ldexp(s, static_cast<int>(m));
 }
 
 DoubleDouble::operator double()
